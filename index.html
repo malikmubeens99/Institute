@@ -16,13 +16,13 @@
 <section id="teachers" class="section"><div class="panel"><div class="row between"><div><h2>Teachers & availability</h2><p class="tiny muted">Availability is entered in each teacher's own local time zone.</p></div><button id="addTeacher">+ Add teacher</button></div><div id="teacherFormWrap" class="hidden"><hr><h3 id="teacherTitle">Add teacher</h3><form id="teacherForm"><input id="teacherId" type="hidden"><div class="two"><div class="field"><label>Teacher name *</label><input id="tName" required></div><div class="field"><label>Login PIN *</label><input id="tPin" inputmode="numeric" pattern="[0-9]{4,12}" required></div><div class="field"><label>Teacher time zone</label><input id="tZone" value="Asia/Karachi" required></div><div class="field"><label>Subjects / notes</label><input id="tNotes"></div></div><div class="field"><label>Weekly availability</label><div id="teacherDays" class="days"></div></div><div class="row"><button>Save teacher</button><button type="button" class="secondary" id="cancelTeacher">Cancel</button></div></form></div><div id="teachersList"></div></div></section>
 <section id="conflicts" class="section"><div class="panel"><h2>Conflicts & availability alerts</h2><div id="conflictList"></div></div></section>
 <section id="adminAttendance" class="section"><div class="panel"><div class="row between"><div><h2>Attendance overview</h2><p class="tiny muted">All teachers' attendance records and daily class status.</p></div><div class="field" style="min-width:170px"><label>Date</label><input id="adminAttendanceDate" type="date"></div></div><div class="row" style="margin:8px 0"><select id="adminAttendanceTeacher" style="max-width:220px"><option value="">All teachers</option></select><select id="adminAttendanceStatus" style="max-width:180px"><option value="">All statuses</option><option>Attended</option><option>Skipped</option></select></div><div id="adminAttendanceSummary" class="grid"></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Student</th><th>Teacher</th><th>Class time</th><th>Status</th></tr></thead><tbody id="adminAttendanceBody"></tbody></table></div><h3>Classes still pending</h3><div id="adminPendingList"></div></div></section>
-<section id="backup" class="section"><div class="panel"><h2>Data backup</h2><p class="muted">Data is synced in real-time with Firebase. Export a backup anytime before clearing browser data.</p><div class="row"><button id="export">Export JSON</button><label class="secondary" style="padding:10px 13px;border-radius:9px;cursor:pointer">Import JSON<input id="import" type="file" accept=".json,application/json" class="hidden"></label><button id="reset" class="danger">Reset data</button></div><div class="notice">Data is synchronized with Firebase Realtime Database.</div></div></section>
+<section id="backup" class="section"><div class="panel"><h2>Data backup</h2><p class="muted">Data is synced in real-time with Firebase Realtime Database. Export a backup anytime before clearing browser data.</p><div class="row"><button id="export">Export JSON</button><label class="secondary" style="padding:10px 13px;border-radius:9px;cursor:pointer">Import JSON<input id="import" type="file" accept=".json,application/json" class="hidden"></label><button id="reset" class="danger">Reset data</button></div><div class="notice">Data is synchronized with Firebase Realtime Database.</div></div></section>
 <section id="myweek" class="section active"><div class="panel"><h2>My weekly schedule</h2><div class="row" style="margin:10px 0"><button class="secondary" id="teacherPrev">← Previous week</button><button class="secondary" id="teacherThis">This week</button><button class="secondary" id="teacherNext">Next week →</button></div><div id="teacherWeekLabel" class="muted tiny"></div><div id="teacherCalendar" class="calendar" style="margin-top:12px"></div></div></section>
 <section id="attendance" class="section"><div class="panel"><h2>Attendance</h2><div class="field" style="max-width:230px"><label>Date</label><input id="attendanceDate" type="date"></div><div id="attendanceList"></div></div></section>
 <p class="tiny muted" style="margin-top:18px">TS × Wisdom · Green & white scheduling workspace</p>
 </div></main><div id="toast" class="toast"></div>
 
-<!-- Firebase Module Script -->
+<!-- Firebase Script -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
@@ -42,7 +42,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const rtdb = getDatabase(app);
-const dbRef = ref(rtdb, "scheduler_data");
+
+// Direct Firebase References
+const rootRef = ref(rtdb, "scheduler_data");
+const studentsRef = ref(rtdb, "scheduler_data/students");
+const attendanceRef = ref(rtdb, "scheduler_data/attendance");
+const teachersRef = ref(rtdb, "scheduler_data/teachers");
 
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],KEY="tswisdom_scheduler_final_v3";
 const $=id=>document.getElementById(id);
@@ -50,6 +55,7 @@ const defaultAvail=()=>Object.fromEntries(DAYS.map(d=>[d,{enabled:true,start:"09
 const seedTeachers=()=>[{id:"tm",name:"Mujahid",pin:"5555",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()},{id:"tn",name:"Muneeb",pin:"6666",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()}];
 let db={teachers:seedTeachers(),students:buildSeedStudents(),attendance:[]},session=null,weekOffset=0,teacherOffset=0;
 
+// Local initial cache
 try{
   const raw=localStorage.getItem(KEY);
   if(raw){const x=JSON.parse(raw);db={...db,...x};}
@@ -65,19 +71,18 @@ try{
   db={teachers:seedTeachers(),students:[],attendance:[]};
 }
 
-// Live Firebase Synchronization
-onValue(dbRef, (snapshot) => {
-  const remoteVal = snapshot.val();
-  if(remoteVal && remoteVal.teachers && remoteVal.students){
-    db = {
-      teachers: remoteVal.teachers || [],
-      students: remoteVal.students || [],
-      attendance: remoteVal.attendance || []
-    };
+// Full live sync from Firebase Realtime Database
+onValue(rootRef, (snapshot) => {
+  const data = snapshot.val();
+  if(data){
+    db.teachers = data.teachers ? (Array.isArray(data.teachers) ? data.teachers : Object.values(data.teachers)) : [];
+    db.students = data.students ? (Array.isArray(data.students) ? data.students : Object.values(data.students)) : [];
+    db.attendance = data.attendance ? (Array.isArray(data.attendance) ? data.attendance : Object.values(data.attendance)) : [];
     localStorage.setItem(KEY, JSON.stringify(db));
     renderAll();
   } else {
-    set(dbRef, JSON.parse(JSON.stringify(db)));
+    // Agar Firebase khali ho toh seed data push krde
+    set(rootRef, JSON.parse(JSON.stringify(db)));
   }
 });
 
@@ -109,15 +114,40 @@ function buildSeedStudents(){
 function slots(s){return Object.entries(s.schedule||{}).flatMap(([day,x])=>Array.isArray(x)?x.map(z=>({...z,day,time:z.time,duration:+z.duration||30})):x?.enabled&&x.time?[{...x,day,time:x.time,duration:+x.duration||30}]:[])}
 function teacher(name){return db.teachers.find(t=>t.name===name||t.id===name)}
 
+// Saara data Firebase me persist krna
 async function persist(){
   try{
     localStorage.setItem(KEY,JSON.stringify(db));
     renderAll();
     toast("Saved & Synced");
-    await set(dbRef, JSON.parse(JSON.stringify(db)));
+    await set(rootRef, JSON.parse(JSON.stringify(db)));
   }catch(e){
-    console.error(e);
+    console.error("Firebase error:", e);
     toast("Saved locally");
+  }
+}
+
+// Sirf attendance ko direct Firebase me save krna
+async function persistAttendance(){
+  try{
+    localStorage.setItem(KEY,JSON.stringify(db));
+    renderAll();
+    toast("Attendance Synced");
+    await set(attendanceRef, JSON.parse(JSON.stringify(db.attendance)));
+  }catch(e){
+    console.error("Firebase attendance error:", e);
+  }
+}
+
+// Sirf students ko direct Firebase me save krna
+async function persistStudents(){
+  try{
+    localStorage.setItem(KEY,JSON.stringify(db));
+    renderAll();
+    toast("Students Synced");
+    await set(studentsRef, JSON.parse(JSON.stringify(db.students)));
+  }catch(e){
+    console.error("Firebase student error:", e);
   }
 }
 
@@ -163,7 +193,7 @@ $("studentForm").addEventListener("submit",e=>{
   let i=db.students.findIndex(x=>x.id===s.id);
   if(i<0)db.students.push(s);else db.students[i]=s;
   $("studentFormWrap").classList.add("hidden");
-  persist();
+  persistStudents();
 });
 
 window.editStudent=function(id){let s=db.students.find(x=>x.id===id);if(!s)return;resetStudent();$("studentId").value=s.id;$("studentTitle").textContent="Edit student";$("sName").value=s.name;$("sAcademy").value=s.academy;$("sTeacher").value=s.teacher;$("sSubject").value=s.subject;$("sZone").value=s.zone;$("sStart").value=s.start;$("sNotes").value=s.notes||"";dayEditor("studentDays","student",s.schedule);$("studentFormWrap").classList.remove("hidden")}
@@ -217,7 +247,7 @@ window.mark=function(id,date,day,time,teacherName,status){
  let key=attendanceKey(id,date,day,time,teacherName),old=db.attendance.find(a=>a.key===key);
  let rec={key,studentId:id,studentName:s.name,teacher:teacherName,date,day,time,status,recordedAt:new Date().toISOString()};
  if(old)Object.assign(old,rec);else db.attendance.push(rec);
- persist();
+ persistAttendance();
 }
 
 function renderAdminAttendance(){
