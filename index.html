@@ -43,11 +43,9 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const rtdb = getDatabase(app);
 
-// Direct Firebase References
 const rootRef = ref(rtdb, "scheduler_data");
 const studentsRef = ref(rtdb, "scheduler_data/students");
 const attendanceRef = ref(rtdb, "scheduler_data/attendance");
-const teachersRef = ref(rtdb, "scheduler_data/teachers");
 
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],KEY="tswisdom_scheduler_final_v3";
 const $=id=>document.getElementById(id);
@@ -55,7 +53,6 @@ const defaultAvail=()=>Object.fromEntries(DAYS.map(d=>[d,{enabled:true,start:"09
 const seedTeachers=()=>[{id:"tm",name:"Mujahid",pin:"5555",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()},{id:"tn",name:"Muneeb",pin:"6666",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()}];
 let db={teachers:seedTeachers(),students:buildSeedStudents(),attendance:[]},session=null,weekOffset=0,teacherOffset=0;
 
-// Local initial cache
 try{
   const raw=localStorage.getItem(KEY);
   if(raw){const x=JSON.parse(raw);db={...db,...x};}
@@ -71,7 +68,6 @@ try{
   db={teachers:seedTeachers(),students:[],attendance:[]};
 }
 
-// Full live sync from Firebase Realtime Database
 onValue(rootRef, (snapshot) => {
   const data = snapshot.val();
   if(data){
@@ -81,7 +77,6 @@ onValue(rootRef, (snapshot) => {
     localStorage.setItem(KEY, JSON.stringify(db));
     renderAll();
   } else {
-    // Agar Firebase khali ho toh seed data push krde
     set(rootRef, JSON.parse(JSON.stringify(db)));
   }
 });
@@ -94,6 +89,7 @@ function dateISO(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart
 function mins(t){let [h,m]=(t||"00:00").split(":").map(Number);return h*60+m}
 function t12(t){let n=mins(t),h=Math.floor(n/60);return `${h%12||12}:${String(n%60).padStart(2,"0")} ${h>=12?"PM":"AM"}`}
 function endTime(t,d){let n=(mins(t)+d)%1440;return `${String(Math.floor(n/60)).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`}
+
 function buildSeedStudents(){
  const make=(id,name,academy,schedule)=>({id,name,teacher:"Mujahid",subject:"Arabic + Quran",academy,zone:"Asia/Karachi",start:"2026-01-01",notes:"Individual 30-minute lessons; slot-specific teacher and subject",schedule});
  const one=(pairs)=>Object.fromEntries(DAYS.map(d=>[d,(pairs[d]||[]).map(time=>({time,duration:30,teacher:"Muneeb",subject:"Quran"}))]));
@@ -114,7 +110,6 @@ function buildSeedStudents(){
 function slots(s){return Object.entries(s.schedule||{}).flatMap(([day,x])=>Array.isArray(x)?x.map(z=>({...z,day,time:z.time,duration:+z.duration||30})):x?.enabled&&x.time?[{...x,day,time:x.time,duration:+x.duration||30}]:[])}
 function teacher(name){return db.teachers.find(t=>t.name===name||t.id===name)}
 
-// Saara data Firebase me persist krna
 async function persist(){
   try{
     localStorage.setItem(KEY,JSON.stringify(db));
@@ -122,12 +117,11 @@ async function persist(){
     toast("Saved & Synced");
     await set(rootRef, JSON.parse(JSON.stringify(db)));
   }catch(e){
-    console.error("Firebase error:", e);
+    console.error("Firebase sync error:", e);
     toast("Saved locally");
   }
 }
 
-// Sirf attendance ko direct Firebase me save krna
 async function persistAttendance(){
   try{
     localStorage.setItem(KEY,JSON.stringify(db));
@@ -135,11 +129,11 @@ async function persistAttendance(){
     toast("Attendance Synced");
     await set(attendanceRef, JSON.parse(JSON.stringify(db.attendance)));
   }catch(e){
-    console.error("Firebase attendance error:", e);
+    console.error("Attendance sync error:", e);
+    toast("Saved locally");
   }
 }
 
-// Sirf students ko direct Firebase me save krna
 async function persistStudents(){
   try{
     localStorage.setItem(KEY,JSON.stringify(db));
@@ -147,7 +141,8 @@ async function persistStudents(){
     toast("Students Synced");
     await set(studentsRef, JSON.parse(JSON.stringify(db.students)));
   }catch(e){
-    console.error("Firebase student error:", e);
+    console.error("Students sync error:", e);
+    toast("Saved locally");
   }
 }
 
@@ -237,18 +232,25 @@ function renderAttendance(){
  let entries=db.students.flatMap(s=>slots(s).filter(x=>x.day===day&&(x.teacher||s.teacher)===session.name&&s.start<=date).map(slot=>({s,slot}))).sort((a,b)=>a.slot.time.localeCompare(b.slot.time));
  $("attendanceList").innerHTML=entries.map(({s,slot})=>{
   let teacherName=slot.teacher||s.teacher,key=attendanceKey(s.id,date,day,slot.time,teacherName),a=db.attendance.find(x=>x.key===key);
-  return `<div class="teacherbox"><div class="row between"><div><b>${esc(s.name)}</b><div class="tiny muted">${t12(slot.time)} · ${slot.duration}m · ${esc(slot.subject||s.subject)} · ${esc(s.academy)}</div></div><span class="pill">${a?.status||"Pending"}</span></div><div class="row" style="margin-top:8px"><button class="small" onclick="mark('${s.id}','${date}','${day}','${slot.time}','${esc(teacherName)}','Attended')">Attended</button><button class="small danger" onclick="mark('${s.id}','${date}','${day}','${slot.time}','${esc(teacherName)}','Skipped')">Skipped</button></div></div>`;
+  return `<div class="teacherbox"><div class="row between"><div><b>${esc(s.name)}</b><div class="tiny muted">${t12(slot.time)} · ${slot.duration}m · ${esc(slot.subject||s.subject)} · ${esc(s.academy)}</div></div><span class="pill">${a?.status||"Pending"}</span></div><div class="row" style="margin-top:8px"><button class="small" onclick="window.mark('${esc(s.id)}','${esc(date)}','${esc(day)}','${esc(slot.time)}','${esc(teacherName)}','Attended')">Attended</button><button class="small danger" onclick="window.mark('${esc(s.id)}','${esc(date)}','${esc(day)}','${esc(slot.time)}','${esc(teacherName)}','Skipped')">Skipped</button></div></div>`;
  }).join("")||'<div class="notice">No classes assigned to you for this date.</div>';
 }
 
 window.mark=function(id,date,day,time,teacherName,status){
- let s=db.students.find(x=>x.id===id&&slots(x).some(z=>z.day===day&&z.time===time&&(z.teacher||x.teacher)===teacherName));
- if(!s||teacherName!==session.name)return;
- let key=attendanceKey(id,date,day,time,teacherName),old=db.attendance.find(a=>a.key===key);
+ if(!session)return;
+ let s=db.students.find(x=>x.id===id);
+ if(!s)return;
+ let key=attendanceKey(id,date,day,time,teacherName);
+ let oldIndex=db.attendance.findIndex(a=>a.key===key);
  let rec={key,studentId:id,studentName:s.name,teacher:teacherName,date,day,time,status,recordedAt:new Date().toISOString()};
- if(old)Object.assign(old,rec);else db.attendance.push(rec);
+ if(oldIndex>=0){
+   db.attendance[oldIndex]=rec;
+ } else {
+   db.attendance.push(rec);
+ }
+ renderAttendance();
  persistAttendance();
-}
+};
 
 function renderAdminAttendance(){
  let date=$("adminAttendanceDate").value||today(),tf=$("adminAttendanceTeacher").value||"",sf=$("adminAttendanceStatus").value||"";
