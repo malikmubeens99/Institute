@@ -22,11 +22,11 @@
 <p class="tiny muted" style="margin-top:18px">TS × Wisdom · Green & white scheduling workspace</p>
 </div></main><div id="toast" class="toast"></div>
 
-<!-- Firebase Script -->
+<!-- Firebase Modular Script -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBZhcFXrC_16FLAQ32v9zhrxmg4uWH_g4Y",
@@ -44,46 +44,51 @@ const analytics = getAnalytics(app);
 const rtdb = getDatabase(app);
 
 const rootRef = ref(rtdb, "scheduler_data");
-const studentsRef = ref(rtdb, "scheduler_data/students");
-const attendanceRef = ref(rtdb, "scheduler_data/attendance");
-
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],KEY="tswisdom_scheduler_final_v3";
 const $=id=>document.getElementById(id);
 const defaultAvail=()=>Object.fromEntries(DAYS.map(d=>[d,{enabled:true,start:"09:00",end:"22:00"}]));
 const seedTeachers=()=>[{id:"tm",name:"Mujahid",pin:"5555",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()},{id:"tn",name:"Muneeb",pin:"6666",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()}];
+
 let db={teachers:seedTeachers(),students:buildSeedStudents(),attendance:[]},session=null,weekOffset=0,teacherOffset=0;
 
+// Local initial cache
 try{
   const raw=localStorage.getItem(KEY);
   if(raw){const x=JSON.parse(raw);db={...db,...x};}
   if(!Array.isArray(db.teachers)||!db.teachers.length)db.teachers=seedTeachers();
   if(!Array.isArray(db.students)||!db.students.length)db.students=buildSeedStudents();
   db.teachers=db.teachers.map(t=>({...t,availability:t.availability||defaultAvail()}));
-  db.teachers=db.teachers.map(t=>{let a={...t.availability};if(t.name==="Mujahid"){a={...a,Tuesday:{enabled:true,start:"00:00",end:"06:00"},Saturday:{enabled:true,start:"00:00",end:"06:00"},Sunday:{enabled:true,start:"00:00",end:"02:00"}}}if(t.name==="Muneeb"){a={...a,Tuesday:{enabled:true,start:"00:00",end:"23:59"},Saturday:{enabled:true,start:"00:00",end:"23:59"},Sunday:{enabled:true,start:"00:00",end:"23:59"}}}return {...t,availability:a}});
   db.students=(db.students||[]).map(s=>({...s,schedule:s.schedule||Object.fromEntries((s.days||[]).map(d=>[d,{enabled:true,time:s.time||"18:00",duration:s.duration||30}]))}));
-  const seeded=buildSeedStudents();
-  seeded.forEach(seed=>{if(!db.students.some(existing=>existing.id===seed.id))db.students.push(seed)});
   db.attendance=db.attendance||[];
 }catch(err){
-  db={teachers:seedTeachers(),students:[],attendance:[]};
+  db={teachers:seedTeachers(),students:buildSeedStudents(),attendance:[]};
 }
 
-// Live sync from Firebase
+function parseArray(val){
+  if(!val) return [];
+  if(Array.isArray(val)) return val.filter(Boolean);
+  return Object.values(val).filter(Boolean);
+}
+
+// Live real-time syncing listener across all devices
 onValue(rootRef, (snapshot) => {
   const data = snapshot.val();
   if(data){
-    db.teachers = data.teachers ? (Array.isArray(data.teachers) ? data.teachers : Object.values(data.teachers)) : [];
-    db.students = data.students ? (Array.isArray(data.students) ? data.students : Object.values(data.students)) : [];
-    db.attendance = data.attendance ? (Array.isArray(data.attendance) ? data.attendance : Object.values(data.attendance)) : [];
+    db.teachers = parseArray(data.teachers);
+    db.students = parseArray(data.students);
+    db.attendance = parseArray(data.attendance);
     localStorage.setItem(KEY, JSON.stringify(db));
     renderAll();
   } else {
-    set(rootRef, JSON.parse(JSON.stringify(db)));
+    saveFullCloud();
   }
+}, (err) => {
+  console.error("Firebase read error (Check Database Rules):", err);
+  toast("Cloud sync error: Check rules");
 });
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),1800)}
+function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),2000)}
 function today(){let d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 function startWeek(offset){let d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7)+offset*7);return d}
 function dateISO(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
@@ -111,38 +116,42 @@ function buildSeedStudents(){
 function slots(s){return Object.entries(s.schedule||{}).flatMap(([day,x])=>Array.isArray(x)?x.map(z=>({...z,day,time:z.time,duration:+z.duration||30})):x?.enabled&&x.time?[{...x,day,time:x.time,duration:+x.duration||30}]:[])}
 function teacher(name){return db.teachers.find(t=>t.name===name||t.id===name)}
 
-async function persist(){
+// Safe array-to-object map for Cloud syncing
+function toMap(arr, keyField='id'){
+  let obj={};
+  (arr||[]).forEach((item, idx)=>{
+    let k = item[keyField] ? String(item[keyField]).replace(/[.#$\[\]\/]/g, '_') : 'idx_'+idx;
+    obj[k] = item;
+  });
+  return obj;
+}
+
+async function saveFullCloud(){
   try{
-    localStorage.setItem(KEY,JSON.stringify(db));
-    renderAll();
-    toast("Saved & Synced");
-    await set(rootRef, JSON.parse(JSON.stringify(db)));
-  }catch(e){
-    console.error("Firebase sync error:", e);
-    toast("Saved locally");
+    localStorage.setItem(KEY, JSON.stringify(db));
+    let payload = {
+      teachers: toMap(db.teachers, 'id'),
+      students: toMap(db.students, 'id'),
+      attendance: toMap(db.attendance, 'key')
+    };
+    await set(rootRef, payload);
+    toast("Saved & Synced Online");
+  }catch(err){
+    console.error("Cloud save failed:", err);
+    toast("Cloud save failed! Check rules");
   }
 }
 
-async function persistAttendance(){
+async function persistAttendanceSingle(record){
   try{
-    localStorage.setItem(KEY,JSON.stringify(db));
-    toast("Attendance Synced");
-    await set(attendanceRef, JSON.parse(JSON.stringify(db.attendance)));
+    localStorage.setItem(KEY, JSON.stringify(db));
+    let sanitizedKey = String(record.key).replace(/[.#$\[\]\/]/g, '_');
+    let recRef = ref(rtdb, `scheduler_data/attendance/${sanitizedKey}`);
+    await set(recRef, record);
+    toast("Attendance Synced Online");
   }catch(e){
-    console.error("Attendance sync error:", e);
-    toast("Saved locally");
-  }
-}
-
-async function persistStudents(){
-  try{
-    localStorage.setItem(KEY,JSON.stringify(db));
-    renderAll();
-    toast("Students Synced");
-    await set(studentsRef, JSON.parse(JSON.stringify(db.students)));
-  }catch(e){
-    console.error("Students sync error:", e);
-    toast("Saved locally");
+    console.error("Attendance online sync error:", e);
+    toast("Cloud sync error! Check rules");
   }
 }
 
@@ -192,14 +201,12 @@ function dayEditor(container,mode,data={}){
 function slotEditor(day,x={}){return `<div class="row" style="margin:5px 0" data-slotrow="${day}"><input type="time" data-day="${day}" data-k="time" value="${esc(x.time||"18:00")}" style="min-width:105px"><select data-day="${day}" data-k="duration" style="max-width:75px">${[30,45,60,90].map(n=>`<option value="${n}" ${+(x.duration||30)===n?"selected":""}>${n}m</option>`).join("")}</select><select data-day="${day}" data-k="teacher" style="max-width:120px">${db.teachers.map(t=>`<option ${((x.teacher||"")===t.name)?"selected":""}>${esc(t.name)}</option>`).join("")}</select><select data-day="${day}" data-k="subject" style="max-width:110px">${["Quran","Arabic","Tajweed","Hifz","Other"].map(v=>`<option ${((x.subject||"Quran")===v)?"selected":""}>${v}</option>`).join("")}</select><button type="button" class="small danger" data-removeslot>×</button></div>`}
 function readDays(container,mode){let o={};DAYS.forEach(d=>{let q=k=>$(container).querySelector(`[data-day="${d}"][data-k="${k}"]`);let enabled=q("enabled").checked;if(mode==="student"){o[d]=enabled?Array.from($(container).querySelectorAll(`[data-slotrow="${d}"]`)).map(r=>({time:r.querySelector('[data-k="time"]').value,duration:+r.querySelector('[data-k="duration"]').value,teacher:r.querySelector('[data-k="teacher"]').value,subject:r.querySelector('[data-k="subject"]').value})).filter(x=>x.time):[]}else{o[d]={enabled,start:q("start").value,end:q("end").value}}});return o}
 
-// Direct document event listener
 document.addEventListener("click",e=>{
   let add=e.target.closest("[data-addslot]");
   if(add){let d=add.dataset.addslot,wrap=document.getElementById("studentDays").querySelector(`[data-slots="${d}"]`);if(wrap)wrap.insertAdjacentHTML("beforeend",slotEditor(d));}
   let rem=e.target.closest("[data-removeslot]");
   if(rem)rem.closest("[data-slotrow]").remove();
 
-  // Robust Attendance Mark Button Handler
   let markBtn=e.target.closest("[data-mark-action]");
   if(markBtn){
     let {markId,markDate,markDay,markTime,markTeacher,markStatus}=markBtn.dataset;
@@ -223,11 +230,12 @@ $("studentForm").addEventListener("submit",e=>{
   let i=db.students.findIndex(x=>x.id===s.id);
   if(i<0)db.students.push(s);else db.students[i]=s;
   $("studentFormWrap").classList.add("hidden");
-  persistStudents();
+  renderAll();
+  saveFullCloud();
 });
 
 window.editStudent=function(id){let s=db.students.find(x=>x.id===id);if(!s)return;resetStudent();$("studentId").value=s.id;$("studentTitle").textContent="Edit student";$("sName").value=s.name;$("sAcademy").value=s.academy;$("sTeacher").value=s.teacher;$("sSubject").value=s.subject;$("sZone").value=s.zone;$("sStart").value=s.start;$("sNotes").value=s.notes||"";dayEditor("studentDays","student",s.schedule);$("studentFormWrap").classList.remove("hidden")}
-window.deleteStudent=function(id){if(confirm("Delete this student?")){db.students=db.students.filter(s=>s.id!==id);db.attendance=db.attendance.filter(a=>a.studentId!==id);persist()}}
+window.deleteStudent=function(id){if(confirm("Delete this student?")){db.students=db.students.filter(s=>s.id!==id);db.attendance=db.attendance.filter(a=>a.studentId!==id);renderAll();saveFullCloud();}}
 
 function resetTeacher(){ $("teacherForm").reset();$("teacherId").value="";$("teacherTitle").textContent="Add teacher";$("tZone").value="Asia/Karachi";dayEditor("teacherDays","teacher",defaultAvail())}
 $("addTeacher").onclick=()=>{resetTeacher();$("teacherFormWrap").classList.remove("hidden")};
@@ -243,11 +251,12 @@ $("teacherForm").addEventListener("submit",e=>{
   if(old&&old.name!==name)db.students.forEach(s=>{if(s.teacher===old.name)s.teacher=name});
   if(old)db.teachers=db.teachers.map(t=>t.id===id?obj:t);else db.teachers.push(obj);
   $("teacherFormWrap").classList.add("hidden");
-  persist();
+  renderAll();
+  saveFullCloud();
 });
 
 window.editTeacher=function(id){let t=teacher(id);if(!t)return;$("teacherForm").reset();$("teacherId").value=t.id;$("teacherTitle").textContent="Edit teacher";$("tName").value=t.name;$("tPin").value=t.pin;$("tZone").value=t.zone;$("tNotes").value=t.notes||"";dayEditor("teacherDays","teacher",t.availability);$("teacherFormWrap").classList.remove("hidden")}
-window.deleteTeacher=function(id){let t=teacher(id);if(!t||db.students.some(s=>s.teacher===t.name)){alert("Reassign this teacher's students first.");return}if(confirm("Delete "+t.name+"?")){db.teachers=db.teachers.filter(x=>x.id!==id);persist()}}
+window.deleteTeacher=function(id){let t=teacher(id);if(!t||db.students.some(s=>s.teacher===t.name)){alert("Reassign this teacher's students first.");return}if(confirm("Delete "+t.name+"?")){db.teachers=db.teachers.filter(x=>x.id!==id);renderAll();saveFullCloud();}}
 
 function conflict(s,slot){let assigned=slot.teacher||s.teacher;let t=teacher(assigned),a=t?.availability?.[slot.day];if(!t)return"Teacher profile missing";if(!a?.enabled)return"Teacher unavailable this day";if(mins(slot.time)<mins(a.start)||mins(slot.time)+slot.duration>mins(a.end))return"Outside teacher availability";let overlap=db.students.filter(x=>x.id!==s.id).flatMap(x=>slots(x).filter(z=>(z.teacher||x.teacher)===assigned&&z.day===slot.day&&mins(slot.time)<mins(z.time)+z.duration&&mins(z.time)<mins(slot.time)+slot.duration).map(()=>x.name));return overlap.length?"Overlaps "+overlap.join(", "):""}
 
@@ -288,7 +297,7 @@ window.mark=function(id,date,day,time,teacherName,status){
    db.attendance.push(rec);
  }
  renderAttendance();
- persistAttendance();
+ persistAttendanceSingle(rec);
 };
 
 function renderAdminAttendance(){
@@ -349,7 +358,8 @@ $("import").addEventListener("change",async e=>{
     let x=JSON.parse(await e.target.files[0].text());
     if(!Array.isArray(x.teachers)||!Array.isArray(x.students))throw Error();
     db={teachers:x.teachers,students:x.students,attendance:x.attendance||[]};
-    persist();
+    renderAll();
+    saveFullCloud();
   }catch(err){alert("Invalid backup file.")}
   e.target.value="";
 });
@@ -357,7 +367,8 @@ $("import").addEventListener("change",async e=>{
 $("reset").onclick=()=>{
   if(confirm("Clear all scheduler data?")){
     db={teachers:seedTeachers(),students:[],attendance:[]};
-    persist();
+    renderAll();
+    saveFullCloud();
   }
 };
 </script></body></html>
