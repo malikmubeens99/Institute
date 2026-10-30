@@ -16,17 +16,17 @@
 <section id="teachers" class="section"><div class="panel"><div class="row between"><div><h2>Teachers & availability</h2><p class="tiny muted">Availability is entered in each teacher's own local time zone.</p></div><button id="addTeacher">+ Add teacher</button></div><div id="teacherFormWrap" class="hidden"><hr><h3 id="teacherTitle">Add teacher</h3><form id="teacherForm"><input id="teacherId" type="hidden"><div class="two"><div class="field"><label>Teacher name *</label><input id="tName" required></div><div class="field"><label>Login PIN *</label><input id="tPin" inputmode="numeric" pattern="[0-9]{4,12}" required></div><div class="field"><label>Teacher time zone</label><input id="tZone" value="Asia/Karachi" required></div><div class="field"><label>Subjects / notes</label><input id="tNotes"></div></div><div class="field"><label>Weekly availability</label><div id="teacherDays" class="days"></div></div><div class="row"><button>Save teacher</button><button type="button" class="secondary" id="cancelTeacher">Cancel</button></div></form></div><div id="teachersList"></div></div></section>
 <section id="conflicts" class="section"><div class="panel"><h2>Conflicts & availability alerts</h2><div id="conflictList"></div></div></section>
 <section id="adminAttendance" class="section"><div class="panel"><div class="row between"><div><h2>Attendance overview</h2><p class="tiny muted">All teachers' attendance records and daily class status.</p></div><div class="field" style="min-width:170px"><label>Date</label><input id="adminAttendanceDate" type="date"></div></div><div class="row" style="margin:8px 0"><select id="adminAttendanceTeacher" style="max-width:220px"><option value="">All teachers</option></select><select id="adminAttendanceStatus" style="max-width:180px"><option value="">All statuses</option><option>Attended</option><option>Skipped</option></select></div><div id="adminAttendanceSummary" class="grid"></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Student</th><th>Teacher</th><th>Class time</th><th>Status</th></tr></thead><tbody id="adminAttendanceBody"></tbody></table></div><h3>Classes still pending</h3><div id="adminPendingList"></div></div></section>
-<section id="backup" class="section"><div class="panel"><h2>Data backup</h2><p class="muted">Data is securely synced with Firebase Cloud. You can also export local JSON backups below.</p><div class="row"><button id="export">Export JSON</button><label class="secondary" style="padding:10px 13px;border-radius:9px;cursor:pointer">Import JSON<input id="import" type="file" accept=".json,application/json" class="hidden"></label><button id="reset" class="danger">Reset data</button></div></div></section>
+<section id="backup" class="section"><div class="panel"><h2>Data backup</h2><p class="muted">Data is synced in real-time with Firebase. Export a backup anytime before clearing browser data.</p><div class="row"><button id="export">Export JSON</button><label class="secondary" style="padding:10px 13px;border-radius:9px;cursor:pointer">Import JSON<input id="import" type="file" accept=".json,application/json" class="hidden"></label><button id="reset" class="danger">Reset data</button></div><div class="notice">Data is synchronized with Firebase Realtime Database.</div></div></section>
 <section id="myweek" class="section active"><div class="panel"><h2>My weekly schedule</h2><div class="row" style="margin:10px 0"><button class="secondary" id="teacherPrev">← Previous week</button><button class="secondary" id="teacherThis">This week</button><button class="secondary" id="teacherNext">Next week →</button></div><div id="teacherWeekLabel" class="muted tiny"></div><div id="teacherCalendar" class="calendar" style="margin-top:12px"></div></div></section>
 <section id="attendance" class="section"><div class="panel"><h2>Attendance</h2><div class="field" style="max-width:230px"><label>Date</label><input id="attendanceDate" type="date"></div><div id="attendanceList"></div></div></section>
 <p class="tiny muted" style="margin-top:18px">TS × Wisdom · Green & white scheduling workspace</p>
 </div></main><div id="toast" class="toast"></div>
 
-<!-- Firebase Modular SDK Scripts -->
+<!-- Firebase Module Script -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBZhcFXrC_16FLAQ32v9zhrxmg4uWH_g4Y",
@@ -41,16 +41,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-const firestore = getFirestore(app);
+const rtdb = getDatabase(app);
+const dbRef = ref(rtdb, "scheduler_data");
 
 const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],KEY="tswisdom_scheduler_final_v3";
 const $=id=>document.getElementById(id);
 const defaultAvail=()=>Object.fromEntries(DAYS.map(d=>[d,{enabled:true,start:"09:00",end:"22:00"}]));
 const seedTeachers=()=>[{id:"tm",name:"Mujahid",pin:"5555",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()},{id:"tn",name:"Muneeb",pin:"6666",zone:"Asia/Karachi",notes:"Tajweed, Quran",availability:defaultAvail()}];
-
 let db={teachers:seedTeachers(),students:buildSeedStudents(),attendance:[]},session=null,weekOffset=0,teacherOffset=0;
 
-// Local fallback initialization
 try{
   const raw=localStorage.getItem(KEY);
   if(raw){const x=JSON.parse(raw);db={...db,...x};}
@@ -66,23 +65,19 @@ try{
   db={teachers:seedTeachers(),students:[],attendance:[]};
 }
 
-// Real-time Firebase Sync listener
-const schedulerDocRef = doc(firestore, "ts_scheduler", "main_state");
-onSnapshot(schedulerDocRef, (snap) => {
-  if (snap.exists()) {
-    const cloudData = snap.data();
-    if (cloudData.teachers && cloudData.students) {
-      db = {
-        teachers: cloudData.teachers || [],
-        students: cloudData.students || [],
-        attendance: cloudData.attendance || []
-      };
-      localStorage.setItem(KEY, JSON.stringify(db));
-      renderAll();
-    }
+// Live Firebase Synchronization
+onValue(dbRef, (snapshot) => {
+  const remoteVal = snapshot.val();
+  if(remoteVal && remoteVal.teachers && remoteVal.students){
+    db = {
+      teachers: remoteVal.teachers || [],
+      students: remoteVal.students || [],
+      attendance: remoteVal.attendance || []
+    };
+    localStorage.setItem(KEY, JSON.stringify(db));
+    renderAll();
   } else {
-    // Initial upload of seed data to cloud
-    setDoc(schedulerDocRef, JSON.parse(JSON.stringify(db)));
+    set(dbRef, JSON.parse(JSON.stringify(db)));
   }
 });
 
@@ -94,7 +89,6 @@ function dateISO(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart
 function mins(t){let [h,m]=(t||"00:00").split(":").map(Number);return h*60+m}
 function t12(t){let n=mins(t),h=Math.floor(n/60);return `${h%12||12}:${String(n%60).padStart(2,"0")} ${h>=12?"PM":"AM"}`}
 function endTime(t,d){let n=(mins(t)+d)%1440;return `${String(Math.floor(n/60)).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`}
-
 function buildSeedStudents(){
  const make=(id,name,academy,schedule)=>({id,name,teacher:"Mujahid",subject:"Arabic + Quran",academy,zone:"Asia/Karachi",start:"2026-01-01",notes:"Individual 30-minute lessons; slot-specific teacher and subject",schedule});
  const one=(pairs)=>Object.fromEntries(DAYS.map(d=>[d,(pairs[d]||[]).map(time=>({time,duration:30,teacher:"Muneeb",subject:"Quran"}))]));
@@ -120,9 +114,9 @@ async function persist(){
     localStorage.setItem(KEY,JSON.stringify(db));
     renderAll();
     toast("Saved & Synced");
-    await setDoc(schedulerDocRef, JSON.parse(JSON.stringify(db)));
+    await set(dbRef, JSON.parse(JSON.stringify(db)));
   }catch(e){
-    console.error("Firebase sync error:", e);
+    console.error(e);
     toast("Saved locally");
   }
 }
@@ -143,18 +137,137 @@ function dayEditor(container,mode,data={}){
   }).join("");
 }
 
-function slotEditor(day,x={}){return `<div class="row" style="margin:5px 0" data-slotrow="${day}"><input type="time" data-day="${day}" data-k="time" value="${esc(x.time||"18:00")}" style="min-width:105px"><select data-day="${day}" data-k="duration" style="max-width:75px">${[30,45,60,90].map(n=>`<option value="${n}" ${+(x.duration\vert{}\vert{}30)===n?"selected":""}>${n}m</option>`).join("")}</select><select data-day="${day}" data-k="teacher" style="max-width:120px">${db.teachers.map(t=>`<option ${((x.teacher\vert{}\vert{}"")===t.name)?"selected":""}>${esc(t.name)}</option>`).join("")}</select><select data-day="${day}" data-k="subject" style="max-width:110px">${["Quran","Arabic","Tajweed","Hifz","Other"].map(v=>`<option ${((x.subject\vert{}\vert{}"Quran")===v)?"selected":""}>${v}</option>`).join("")}</select><button type="button" class="small danger" data-removeslot>×</button></div>`}
+function slotEditor(day,x={}){return `<div class="row" style="margin:5px 0" data-slotrow="${day}"><input type="time" data-day="${day}" data-k="time" value="${esc(x.time||"18:00")}" style="min-width:105px"><select data-day="${day}" data-k="duration" style="max-width:75px">${[30,45,60,90].map(n=>`<option value="${n}" ${+(x.duration||30)===n?"selected":""}>${n}m</option>`).join("")}</select><select data-day="${day}" data-k="teacher" style="max-width:120px">${db.teachers.map(t=>`<option ${((x.teacher||"")===t.name)?"selected":""}>${esc(t.name)}</option>`).join("")}</select><select data-day="${day}" data-k="subject" style="max-width:110px">${["Quran","Arabic","Tajweed","Hifz","Other"].map(v=>`<option ${((x.subject||"Quran")===v)?"selected":""}>${v}</option>`).join("")}</select><button type="button" class="small danger" data-removeslot>×</button></div>`}
 function readDays(container,mode){let o={};DAYS.forEach(d=>{let q=k=>$(container).querySelector(`[data-day="${d}"][data-k="${k}"]`);let enabled=q("enabled").checked;if(mode==="student"){o[d]=enabled?Array.from($(container).querySelectorAll(`[data-slotrow="${d}"]`)).map(r=>({time:r.querySelector('[data-k="time"]').value,duration:+r.querySelector('[data-k="duration"]').value,teacher:r.querySelector('[data-k="teacher"]').value,subject:r.querySelector('[data-k="subject"]').value})).filter(x=>x.time):[]}else{o[d]={enabled,start:q("start").value,end:q("end").value}}});return o}
 
 $(document).addEventListener("click",e=>{
   let add=e.target.closest("[data-addslot]");
   if(add){let d=add.dataset.addslot,wrap=$(add.closest("#studentDays")?"studentDays":"studentDays").querySelector(`[data-slots="${d}"]`);wrap.insertAdjacentHTML("beforeend",slotEditor(d));}
   let rem=e.target.closest("[data-removeslot]");
-  if(rem)rem.closest("[data-slotrow]").remove()
+  if(rem)rem.closest("[data-slotrow]").remove();
 });
 
 function fillTeacherOptions(){let html=db.teachers.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join("");$("sTeacher").innerHTML=html;$("filterTeacher").innerHTML='<option value="">All teachers</option>'+html}
 function resetStudent(){ $("studentForm").reset();$("studentId").value="";$("studentTitle").textContent="Add student";$("sZone").value="Asia/Karachi";$("sStart").value=today();dayEditor("studentDays","student");fillTeacherOptions()}
 
 $("addStudent").onclick=()=>{resetStudent();$("studentFormWrap").classList.remove("hidden")};
-$("cancelStudent").onclick=()=>$("studentFormWrap
+$("cancelStudent").onclick=()=>$("studentFormWrap").classList.add("hidden");
+
+$("studentForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  if(session?.role!=="admin")return;
+  let schedule=readDays("studentDays","student");
+  if(!Object.values(schedule).some(x=>Array.isArray(x)?x.length>0:x.enabled)){alert("Select at least one class day.");return}
+  let s={id:$("studentId").value||"s"+Date.now(),name:$("sName").value.trim(),academy:$("sAcademy").value,teacher:$("sTeacher").value,subject:$("sSubject").value,zone:$("sZone").value.trim(),start:$("sStart").value||today(),notes:$("sNotes").value.trim(),schedule};
+  try{new Intl.DateTimeFormat("en",{timeZone:s.zone})}catch(e){alert("Enter a valid IANA timezone, e.g. Asia/Karachi.");return}
+  let i=db.students.findIndex(x=>x.id===s.id);
+  if(i<0)db.students.push(s);else db.students[i]=s;
+  $("studentFormWrap").classList.add("hidden");
+  persist();
+});
+
+window.editStudent=function(id){let s=db.students.find(x=>x.id===id);if(!s)return;resetStudent();$("studentId").value=s.id;$("studentTitle").textContent="Edit student";$("sName").value=s.name;$("sAcademy").value=s.academy;$("sTeacher").value=s.teacher;$("sSubject").value=s.subject;$("sZone").value=s.zone;$("sStart").value=s.start;$("sNotes").value=s.notes||"";dayEditor("studentDays","student",s.schedule);$("studentFormWrap").classList.remove("hidden")}
+window.deleteStudent=function(id){if(confirm("Delete this student?")){db.students=db.students.filter(s=>s.id!==id);db.attendance=db.attendance.filter(a=>a.studentId!==id);persist()}}
+
+function resetTeacher(){ $("teacherForm").reset();$("teacherId").value="";$("teacherTitle").textContent="Add teacher";$("tZone").value="Asia/Karachi";dayEditor("teacherDays","teacher",defaultAvail())}
+$("addTeacher").onclick=()=>{resetTeacher();$("teacherFormWrap").classList.remove("hidden")};
+$("cancelTeacher").onclick=()=>$("teacherFormWrap").classList.add("hidden");
+
+$("teacherForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  if(session?.role!=="admin")return;
+  let id=$("teacherId").value||"t"+Date.now(),name=$("tName").value.trim(),pin=$("tPin").value.trim();
+  if(db.teachers.some(t=>t.pin===pin&&t.id!==id)){alert("PIN already used.");return}
+  try{new Intl.DateTimeFormat("en",{timeZone:$("tZone").value})}catch(e){alert("Enter a valid IANA timezone.");return}
+  let old=teacher(id),obj={id,name,pin,zone:$("tZone").value.trim(),notes:$("tNotes").value.trim(),availability:readDays("teacherDays","teacher")};
+  if(old&&old.name!==name)db.students.forEach(s=>{if(s.teacher===old.name)s.teacher=name});
+  if(old)db.teachers=db.teachers.map(t=>t.id===id?obj:t);else db.teachers.push(obj);
+  $("teacherFormWrap").classList.add("hidden");
+  persist();
+});
+
+window.editTeacher=function(id){let t=teacher(id);if(!t)return;$("teacherForm").reset();$("teacherId").value=t.id;$("teacherTitle").textContent="Edit teacher";$("tName").value=t.name;$("tPin").value=t.pin;$("tZone").value=t.zone;$("tNotes").value=t.notes||"";dayEditor("teacherDays","teacher",t.availability);$("teacherFormWrap").classList.remove("hidden")}
+window.deleteTeacher=function(id){let t=teacher(id);if(!t||db.students.some(s=>s.teacher===t.name)){alert("Reassign this teacher's students first.");return}if(confirm("Delete "+t.name+"?")){db.teachers=db.teachers.filter(x=>x.id!==id);persist()}}
+
+function conflict(s,slot){let assigned=slot.teacher||s.teacher;let t=teacher(assigned),a=t?.availability?.[slot.day];if(!t)return"Teacher profile missing";if(!a?.enabled)return"Teacher unavailable this day";if(mins(slot.time)<mins(a.start)||mins(slot.time)+slot.duration>mins(a.end))return"Outside teacher availability";let overlap=db.students.filter(x=>x.id!==s.id).flatMap(x=>slots(x).filter(z=>(z.teacher||x.teacher)===assigned&&z.day===slot.day&&mins(slot.time)<mins(z.time)+z.duration&&mins(z.time)<mins(slot.time)+slot.duration).map(()=>x.name));return overlap.length?"Overlaps "+overlap.join(", "):""}
+
+function renderCalendar(target,offset,teacherOnly){let st=startWeek(offset),events=[];DAYS.forEach(day=>db.students.forEach(s=>{let daySlots=Array.isArray(s.schedule?.[day])?s.schedule[day]:(s.schedule?.[day]?.enabled?[s.schedule[day]]:[]);if(s.start<=dateISO(new Date(st.getTime()+DAYS.indexOf(day)*86400000)))daySlots.forEach(slot=>{if(!teacherOnly||(slot.teacher||s.teacher)===session.name)events.push({s,day,slot})})}));let end=new Date(st);end.setDate(st.getDate()+6);$(target==="masterCalendar"?"weekLabel":"teacherWeekLabel").textContent=dateISO(st)+" → "+dateISO(end);$(target).innerHTML=DAYS.map(day=>{let arr=events.filter(e=>e.day===day&&(!teacherOnly?(!$("filterTeacher").value||(e.slot.teacher||e.s.teacher)===$("filterTeacher").value):true)&&(!teacherOnly?(!$("filterAcademy").value||e.s.academy===$("filterAcademy").value):true)).sort((a,b)=>a.slot.time.localeCompare(b.slot.time));return `<div class="daycol"><h3>${day} <span class="muted tiny">· ${arr.length}</span></h3>${arr.map(e=>{let c=conflict(e.s,{...e.slot,day});let assigned=e.slot.teacher||e.s.teacher;return `<div class="event ${e.s.academy==="Tajweed Scholars"?"ts":e.s.academy==="Uniqe Academy"?"ext":""} ${c?"conflict":""}"><b>${t12(e.slot.time)}–${t12(endTime(e.slot.time,+e.slot.duration))}</b><b>${esc(e.s.name)}</b><small>${esc(assigned)} · ${esc(e.slot.subject||e.s.subject)} · ${esc(e.s.academy)} · ${e.slot.duration}m</small>${c?`<div class="warning">⚠ ${esc(c)}</div>`:""}</div>`}).join("")||'<div class="muted tiny">No classes</div>'}</div>`}).join("")}
+
+function renderStudents(){let q=$("studentSearch").value.toLowerCase();$("studentsBody").innerHTML=db.students.filter(s=>[s.name,s.teacher,s.academy,s.subject].join(" ").toLowerCase().includes(q)).map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.academy)}<br><small>${esc(s.subject)}</small></td><td>${[...new Set(slots(s).map(x=>x.teacher||s.teacher))].map(esc).join(", ")}</td><td>${slots(s).map(x=>`${x.day.slice(0,3)} ${t12(x.time)} · ${x.duration}m · ${esc(x.teacher||s.teacher)} / ${esc(x.subject||s.subject)}`).join("<br>")}</td><td>${esc(s.zone)}</td><td><button class="small secondary" onclick="editStudent('${s.id}')">Edit</button> <button class="small danger" onclick="deleteStudent('${s.id}')">Delete</button></td></tr>`).join("")||'<tr><td colspan="6" class="muted">No students added yet.</td></tr>'}
+
+function renderTeachers(){$("teachersList").innerHTML=db.teachers.map(t=>`<div class="teacherbox"><div class="row between"><div><b>${esc(t.name)}</b> <span class="pill">${db.students.filter(s=>slots(s).some(z=>(z.teacher||s.teacher)===t.name)).length} students</span><div class="tiny muted">${esc(t.zone)} · ${esc(t.notes||"")}</div></div><div class="row"><button class="small secondary" onclick="editTeacher('${t.id}')">Edit</button>${!["tm","tn"].includes(t.id)?`<button class="small danger" onclick="deleteTeacher('${t.id}')">Delete</button>`:""}</div></div><div class="tiny muted" style="margin-top:8px">${DAYS.map(d=>`${d.slice(0,3)}: ${t.availability[d]?.enabled?t12(t.availability[d].start)+"–"+t12(t.availability[d].end):"Off"}`).join(" · ")}</div></div>`).join("")}
+
+function renderConflicts(){let a=[];db.students.forEach(s=>slots(s).forEach(x=>{let c=conflict(s,x);if(c)a.push(`<div class="notice bad"><b>${esc(s.name)}</b> · ${esc(s.teacher)} · ${x.day} ${t12(x.time)} — ${esc(c)}</div>`)}));$("conflictList").innerHTML=a.join("")||'<div class="notice good">No conflicts found in current weekly records.</div>';$("statAlerts").textContent=a.length}
+
+function attendanceKey(id,date,day,time,teacherName){return [id,date,day,time,teacherName].join("|")}
+
+function renderAttendance(){
+ let date=$("attendanceDate").value||today();
+ let day=DAYS[(new Date(date+"T12:00:00").getDay()+6)%7];
+ let entries=db.students.flatMap(s=>slots(s).filter(x=>x.day===day&&(x.teacher||s.teacher)===session.name&&s.start<=date).map(slot=>({s,slot}))).sort((a,b)=>a.slot.time.localeCompare(b.slot.time));
+ $("attendanceList").innerHTML=entries.map(({s,slot})=>{
+  let teacherName=slot.teacher||s.teacher,key=attendanceKey(s.id,date,day,slot.time,teacherName),a=db.attendance.find(x=>x.key===key);
+  return `<div class="teacherbox"><div class="row between"><div><b>${esc(s.name)}</b><div class="tiny muted">${t12(slot.time)} · ${slot.duration}m · ${esc(slot.subject||s.subject)} · ${esc(s.academy)}</div></div><span class="pill">${a?.status||"Pending"}</span></div><div class="row" style="margin-top:8px"><button class="small" onclick="mark('${s.id}','${date}','${day}','${slot.time}','${esc(teacherName)}','Attended')">Attended</button><button class="small danger" onclick="mark('${s.id}','${date}','${day}','${slot.time}','${esc(teacherName)}','Skipped')">Skipped</button></div></div>`;
+ }).join("")||'<div class="notice">No classes assigned to you for this date.</div>';
+}
+
+window.mark=function(id,date,day,time,teacherName,status){
+ let s=db.students.find(x=>x.id===id&&slots(x).some(z=>z.day===day&&z.time===time&&(z.teacher||x.teacher)===teacherName));
+ if(!s||teacherName!==session.name)return;
+ let key=attendanceKey(id,date,day,time,teacherName),old=db.attendance.find(a=>a.key===key);
+ let rec={key,studentId:id,studentName:s.name,teacher:teacherName,date,day,time,status,recordedAt:new Date().toISOString()};
+ if(old)Object.assign(old,rec);else db.attendance.push(rec);
+ persist();
+}
+
+function renderAdminAttendance(){
+ let date=$("adminAttendanceDate").value||today(),tf=$("adminAttendanceTeacher").value||"",sf=$("adminAttendanceStatus").value||"";
+ $("adminAttendanceTeacher").innerHTML='<option value="">All teachers</option>'+db.teachers.map(t=>`<option value="${esc(t.name)}" ${tf===t.name?"selected":""}>${esc(t.name)}</option>`).join("");
+ let records=db.attendance.filter(a=>a.date===date&&(!tf||a.teacher===tf)&&(!sf||a.status===sf));
+ $("adminAttendanceSummary").innerHTML=[["Attended",records.filter(a=>a.status==="Attended").length],["Skipped",records.filter(a=>a.status==="Skipped").length],["Recorded",records.length]].map(([k,v])=>`<div class="stat">${k}<strong>${v}</strong></div>`).join("");
+ $("adminAttendanceBody").innerHTML=records.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.studentName)}</td><td>${esc(a.teacher)}</td><td>${a.time?t12(a.time):"—"}</td><td><span class="pill">${esc(a.status)}</span></td></tr>`).join("")||'<tr><td colspan="5" class="muted">No attendance records for this date.</td></tr>';
+ let weekday=DAYS[(new Date(date+"T12:00:00").getDay()+6)%7];
+ let pending=db.students.flatMap(s=>slots(s).filter(z=>z.day===weekday&&s.start<=date).map(z=>({s,z,tn:z.teacher||s.teacher,key:attendanceKey(s.id,date,weekday,z.time,z.teacher||s.teacher)}))).filter(x=>!db.attendance.some(a=>a.key===x.key));
+ $("adminPendingList").innerHTML=pending.map(x=>`<div class="teacherbox"><b>${esc(x.s.name)}</b> · ${esc(x.tn)} · ${t12(x.z.time)} · ${esc(x.z.subject||x.s.subject)} <span class="pill">Pending</span></div>`).join("")||'<div class="notice good">No pending classes for this date.</div>';
+}
+
+function renderAll(){if(!session)return;fillTeacherOptions();let visible=session.role==="admin"?db.students:db.students.filter(s=>slots(s).some(z=>(z.teacher||s.teacher)===session.name));$("statStudents").textContent=visible.length;$("statTeachers").textContent=session.role==="admin"?db.teachers.length:1;$("statClasses").textContent=db.students.reduce((n,s)=>n+slots(s).length,0);renderConflicts();if(session.role==="admin"){renderStudents();renderTeachers();renderCalendar("masterCalendar",weekOffset,false);renderAdminAttendance()}else{renderCalendar("teacherCalendar",teacherOffset,true);renderAttendance()}}
+
+$("studentSearch").addEventListener("input",renderStudents);
+$("filterTeacher").addEventListener("change",()=>renderCalendar("masterCalendar",weekOffset,false));
+$("filterAcademy").addEventListener("change",()=>renderCalendar("masterCalendar",weekOffset,false));
+
+$("prevWeek").onclick=()=>{weekOffset--;renderCalendar("masterCalendar",weekOffset,false)};
+$("nextWeek").onclick=()=>{weekOffset++;renderCalendar("masterCalendar",weekOffset,false)};
+$("thisWeek").onclick=()=>{weekOffset=0;renderCalendar("masterCalendar",weekOffset,false)};
+
+$("teacherPrev").onclick=()=>{teacherOffset--;renderCalendar("teacherCalendar",teacherOffset,true)};
+$("teacherNext").onclick=()=>{teacherOffset++;renderCalendar("teacherCalendar",teacherOffset,true)};
+$("teacherThis").onclick=()=>{teacherOffset=0;renderCalendar("teacherCalendar",teacherOffset,true)};
+
+$("attendanceDate").value=today();
+$("attendanceDate").addEventListener("change",renderAttendance);
+$("adminAttendanceDate").value=today();
+$("adminAttendanceDate").addEventListener("change",renderAdminAttendance);
+$("adminAttendanceTeacher").addEventListener("change",renderAdminAttendance);
+$("adminAttendanceStatus").addEventListener("change",renderAdminAttendance);
+
+$("export").onclick=()=>{let a=document.createElement("a"),u=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.href=u;a.download="ts-wisdom-backup.json";a.click();URL.revokeObjectURL(u)};
+
+$("import").addEventListener("change",async e=>{
+  try{
+    let x=JSON.parse(await e.target.files[0].text());
+    if(!Array.isArray(x.teachers)||!Array.isArray(x.students))throw Error();
+    db={teachers:x.teachers,students:x.students,attendance:x.attendance||[]};
+    persist();
+  }catch(err){alert("Invalid backup file.")}
+  e.target.value="";
+});
+
+$("reset").onclick=()=>{
+  if(confirm("Clear all scheduler data?")){
+    db={teachers:seedTeachers(),students:[],attendance:[]};
+    persist();
+  }
+};
+</script></body></html>
