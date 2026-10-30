@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TS × Wisdom Smart Scheduler</title>
 <style>
 :root{--g:#287f69;--g2:#206e5b;--p:#f2f7f5;--ink:#17352d;--muted:#647b74;--line:#dce8e3;--red:#c93649;--blue:#477fe0;--gold:#b98b43}
-*{box-sizing:border-box}body{margin:0;background:var(--p);color:var(--ink);font:14px/1.45 Inter,system-ui,Arial}header{background:var(--g);color:#fff;padding:18px clamp(15px,3vw,38px);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}h1{font-size:21px;margin:0}header p{margin:3px 0 0;color:#e4f3ee}.wrap{max-width:1500px;margin:auto;padding:22px clamp(12px,2vw,28px)}.panel,.stat,.loginbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 4px 18px #143c2d0a}.login{max-width:420px;margin:50px auto}.hidden{display:none!important}.muted{color:var(--muted)}.tiny{font-size:12px}button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 14px;font-weight:700;cursor:pointer}button:hover{filter:brightness(1.07)}button.secondary{background:#e8f3ef;color:var(--g2);border:1px solid #cfe3da}button.danger{background:#fff0f1;color:#a91f31;border:1px solid #f2c9ce}button.small{padding:6px 9px;font-size:12px}input,select,textarea{font:inherit;padding:10px;border:1px solid #ceddd6;border-radius:9px;width:100%;background:white;color:var(--ink)}label{font-size:12px;font-weight:700;color:#536b62}.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat strong{display:block;font-size:27px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.tabs button{background:white;color:var(--g2);border:1px solid var(--line)}.tabs button.active{background:var(--g);color:white}.section{display:none}.section.active{display:block}.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tablewrap{overflow:auto;margin-top:12px}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}th{background:#f4f9f6;color:#61766e;font-size:11px;text-transform:uppercase}.pill{background:#e8f3ef;color:var(--g2);border-radius:20px;padding:4px 8px;font-size:11px;font-weight:700}.notice{padding:12px;border-radius:10px;background:#fff8e9;border:1px solid #ecd9a8;margin:10px 0}.bad{background:#fff0f1;border-color:#efbbc3;color:#a62032}.good{background:#eaf7ef;border-color:#b9e3c7;color:#17633d}.days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.dayrow{border:1px solid var(--line);border-radius:10px;padding:9px;display:grid;grid-template-columns:85px 1fr 85px;gap:8px;align-items:center}.dayrow input[type=checkbox]{width:auto}.calendar{display:grid;grid-template-columns:repeat(7,minmax(145px,1fr));gap:9px;overflow:auto}.daycol{min-width:145px;background:#f6faf8;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:220px}.daycol h3{font-size:14px;margin:3px 0 10px;border-bottom:1px solid var(--line);padding-bottom:9px}.event{background:white;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:9px;padding:9px;margin:8px 0}.event.ts{border-left-color:#20a58d}.event.ext{border-left-color:var(--gold)}.event.conflict{border-color:#efadb6;border-left-color:var(--red);background:#fff1f2}.event b{display:block;margin:4px 0}.event small{color:var(--muted)}.event .warning{color:var(--red);font-size:11px;font-weight:800}.teacherbox{padding:12px;border:1px solid var(--line);border-radius:11px;margin:9px 0}.toast{position:fixed;right:18px;bottom:18px;background:#173d31;color:white;border-radius:10px;padding:12px 16px;display:none;z-index:9999}.toast.show{display:block}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.calendar{grid-template-columns:repeat(7,165px)}}@media(max-width:600px){.two{grid-template-columns:1fr}.days{grid-template-columns:1fr}h1{font-size:18px}}
+*{box-sizing:border-box}body{margin:0;background:var(--p);color:var(--ink);font:14px/1.45 Inter,system-ui,Arial}header{background:var(--g);color:#fff;padding:18px clamp(15px,3vw,38px);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}h1{font-size:21px;margin:0}header p{margin:3px 0 0;color:#e4f3ee}.wrap{max-width:1500px;margin:auto;padding:22px clamp(12px,2vw,28px)}.panel,.stat,.loginbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 4px 18px #143c2d0a}.login{max-width:420px;margin:50px auto}.hidden{display:none!important}.muted{color:var(--muted)}.tiny{font-size:12px}button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 14px;font-weight:700;cursor:pointer}button:hover{filter:brightness(1.07)}button.secondary{background:#e8f3ef;color:var(--g2);border:1px solid #cfe3da}button.danger{background:#fff0f1;color:#a91f31;border:1px solid #f2c9ce}button.danger.active-btn{background:#c93649;color:#fff;border-color:#c93649}button.active-attended{background:#1b5e4d;color:#fff;box-shadow:0 0 0 2px #cfe3da}button.small{padding:6px 9px;font-size:12px}input,select,textarea{font:inherit;padding:10px;border:1px solid #ceddd6;border-radius:9px;width:100%;background:white;color:var(--ink)}label{font-size:12px;font-weight:700;color:#536b62}.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat strong{display:block;font-size:27px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.tabs button{background:white;color:var(--g2);border:1px solid var(--line)}.tabs button.active{background:var(--g);color:white}.section{display:none}.section.active{display:block}.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tablewrap{overflow:auto;margin-top:12px}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}th{background:#f4f9f6;color:#61766e;font-size:11px;text-transform:uppercase}.pill{background:#e8f3ef;color:var(--g2);border-radius:20px;padding:4px 8px;font-size:11px;font-weight:700}.pill.pill-attended{background:#eaf7ef;color:#17633d}.pill.pill-skipped{background:#fff0f1;color:#a62032}.notice{padding:12px;border-radius:10px;background:#fff8e9;border:1px solid #ecd9a8;margin:10px 0}.bad{background:#fff0f1;border-color:#efbbc3;color:#a62032}.good{background:#eaf7ef;border-color:#b9e3c7;color:#17633d}.days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.dayrow{border:1px solid var(--line);border-radius:10px;padding:9px;display:grid;grid-template-columns:85px 1fr 85px;gap:8px;align-items:center}.dayrow input[type=checkbox]{width:auto}.calendar{display:grid;grid-template-columns:repeat(7,minmax(145px,1fr));gap:9px;overflow:auto}.daycol{min-width:145px;background:#f6faf8;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:220px}.daycol h3{font-size:14px;margin:3px 0 10px;border-bottom:1px solid var(--line);padding-bottom:9px}.event{background:white;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:9px;padding:9px;margin:8px 0}.event.ts{border-left-color:#20a58d}.event.ext{border-left-color:var(--gold)}.event.conflict{border-color:#efadb6;border-left-color:var(--red);background:#fff1f2}.event b{display:block;margin:4px 0}.event small{color:var(--muted)}.event .warning{color:var(--red);font-size:11px;font-weight:800}.teacherbox{padding:12px;border:1px solid var(--line);border-radius:11px;margin:9px 0}.toast{position:fixed;right:18px;bottom:18px;background:#173d31;color:white;border-radius:10px;padding:12px 16px;display:none;z-index:9999}.toast.show{display:block}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.calendar{grid-template-columns:repeat(7,165px)}}@media(max-width:600px){.two{grid-template-columns:1fr}.days{grid-template-columns:1fr}h1{font-size:18px}}
 </style></head><body>
 <header><div><h1>TS × Wisdom Smart Scheduler</h1><p>Weekly timetable · Teacher availability · Student management</p></div><div id="userArea" class="row hidden"><b id="who"></b><button class="secondary" id="logout">Log out</button></div></header>
 <main class="wrap">
@@ -68,6 +68,7 @@ try{
   db={teachers:seedTeachers(),students:[],attendance:[]};
 }
 
+// Live sync from Firebase
 onValue(rootRef, (snapshot) => {
   const data = snapshot.val();
   if(data){
@@ -125,7 +126,6 @@ async function persist(){
 async function persistAttendance(){
   try{
     localStorage.setItem(KEY,JSON.stringify(db));
-    renderAll();
     toast("Attendance Synced");
     await set(attendanceRef, JSON.parse(JSON.stringify(db.attendance)));
   }catch(e){
@@ -146,8 +146,35 @@ async function persistStudents(){
   }
 }
 
-function login(e){e.preventDefault();let pin=$("pin").value.trim(),t=db.teachers.find(x=>x.pin===pin);let a=pin==="9006"?{role:"admin",name:"Admin"}:t?{role:"teacher",name:t.name,id:t.id}:null;if(!a){$("loginError").classList.remove("hidden");return}session=a;$("loginError").classList.add("hidden");$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("userArea").classList.remove("hidden");$("who").textContent=a.name+" · "+a.role;$("adminTabs").classList.toggle("hidden",a.role!=="admin");$("teacherTabs").classList.toggle("hidden",a.role!=="teacher");activate(a.role==="admin"?"master":"myweek");renderAll()}
-function activate(id){document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id===id));document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("active",x.dataset.tab===id))}
+function login(e){
+  e.preventDefault();
+  let pin=$("pin").value.trim(),t=db.teachers.find(x=>x.pin===pin);
+  let a=pin==="9006"?{role:"admin",name:"Admin"}:t?{role:"teacher",name:t.name,id:t.id}:null;
+  if(!a){$("loginError").classList.remove("hidden");return}
+  session=a;
+  $("loginError").classList.add("hidden");
+  $("loginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+  $("userArea").classList.remove("hidden");
+  $("who").textContent=a.name+" · "+a.role;
+  $("adminTabs").classList.toggle("hidden",a.role!=="admin");
+  $("teacherTabs").classList.toggle("hidden",a.role!=="teacher");
+  activate(a.role==="admin"?"master":"myweek");
+  renderAll();
+}
+
+function activate(id){
+  document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id===id));
+  document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("active",x.dataset.tab===id));
+  if(id==="attendance"){
+    if(!$("attendanceDate").value) $("attendanceDate").value = today();
+    renderAttendance();
+  }
+  if(id==="adminAttendance"){
+    if(!$("adminAttendanceDate").value) $("adminAttendanceDate").value = today();
+    renderAdminAttendance();
+  }
+}
 
 $("loginForm").addEventListener("submit",login);
 $("logout").onclick=()=>{session=null;$("pin").value="";$("appView").classList.add("hidden");$("userArea").classList.add("hidden");$("loginView").classList.remove("hidden")};
@@ -165,11 +192,19 @@ function dayEditor(container,mode,data={}){
 function slotEditor(day,x={}){return `<div class="row" style="margin:5px 0" data-slotrow="${day}"><input type="time" data-day="${day}" data-k="time" value="${esc(x.time||"18:00")}" style="min-width:105px"><select data-day="${day}" data-k="duration" style="max-width:75px">${[30,45,60,90].map(n=>`<option value="${n}" ${+(x.duration||30)===n?"selected":""}>${n}m</option>`).join("")}</select><select data-day="${day}" data-k="teacher" style="max-width:120px">${db.teachers.map(t=>`<option ${((x.teacher||"")===t.name)?"selected":""}>${esc(t.name)}</option>`).join("")}</select><select data-day="${day}" data-k="subject" style="max-width:110px">${["Quran","Arabic","Tajweed","Hifz","Other"].map(v=>`<option ${((x.subject||"Quran")===v)?"selected":""}>${v}</option>`).join("")}</select><button type="button" class="small danger" data-removeslot>×</button></div>`}
 function readDays(container,mode){let o={};DAYS.forEach(d=>{let q=k=>$(container).querySelector(`[data-day="${d}"][data-k="${k}"]`);let enabled=q("enabled").checked;if(mode==="student"){o[d]=enabled?Array.from($(container).querySelectorAll(`[data-slotrow="${d}"]`)).map(r=>({time:r.querySelector('[data-k="time"]').value,duration:+r.querySelector('[data-k="duration"]').value,teacher:r.querySelector('[data-k="teacher"]').value,subject:r.querySelector('[data-k="subject"]').value})).filter(x=>x.time):[]}else{o[d]={enabled,start:q("start").value,end:q("end").value}}});return o}
 
-$(document).addEventListener("click",e=>{
+// Direct document event listener
+document.addEventListener("click",e=>{
   let add=e.target.closest("[data-addslot]");
-  if(add){let d=add.dataset.addslot,wrap=$(add.closest("#studentDays")?"studentDays":"studentDays").querySelector(`[data-slots="${d}"]`);wrap.insertAdjacentHTML("beforeend",slotEditor(d));}
+  if(add){let d=add.dataset.addslot,wrap=document.getElementById("studentDays").querySelector(`[data-slots="${d}"]`);if(wrap)wrap.insertAdjacentHTML("beforeend",slotEditor(d));}
   let rem=e.target.closest("[data-removeslot]");
   if(rem)rem.closest("[data-slotrow]").remove();
+
+  // Robust Attendance Mark Button Handler
+  let markBtn=e.target.closest("[data-mark-action]");
+  if(markBtn){
+    let {markId,markDate,markDay,markTime,markTeacher,markStatus}=markBtn.dataset;
+    window.mark(markId,markDate,markDay,markTime,markTeacher,markStatus);
+  }
 });
 
 function fillTeacherOptions(){let html=db.teachers.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join("");$("sTeacher").innerHTML=html;$("filterTeacher").innerHTML='<option value="">All teachers</option>'+html}
@@ -228,11 +263,15 @@ function attendanceKey(id,date,day,time,teacherName){return [id,date,day,time,te
 
 function renderAttendance(){
  let date=$("attendanceDate").value||today();
+ if(!$("attendanceDate").value) $("attendanceDate").value=date;
  let day=DAYS[(new Date(date+"T12:00:00").getDay()+6)%7];
  let entries=db.students.flatMap(s=>slots(s).filter(x=>x.day===day&&(x.teacher||s.teacher)===session.name&&s.start<=date).map(slot=>({s,slot}))).sort((a,b)=>a.slot.time.localeCompare(b.slot.time));
  $("attendanceList").innerHTML=entries.map(({s,slot})=>{
   let teacherName=slot.teacher||s.teacher,key=attendanceKey(s.id,date,day,slot.time,teacherName),a=db.attendance.find(x=>x.key===key);
-  return `<div class="teacherbox"><div class="row between"><div><b>${esc(s.name)}</b><div class="tiny muted">${t12(slot.time)} · ${slot.duration}m · ${esc(slot.subject||s.subject)} · ${esc(s.academy)}</div></div><span class="pill">${a?.status||"Pending"}</span></div><div class="row" style="margin-top:8px"><button class="small" onclick="window.mark('${esc(s.id)}','${esc(date)}','${esc(day)}','${esc(slot.time)}','${esc(teacherName)}','Attended')">Attended</button><button class="small danger" onclick="window.mark('${esc(s.id)}','${esc(date)}','${esc(day)}','${esc(slot.time)}','${esc(teacherName)}','Skipped')">Skipped</button></div></div>`;
+  let status=a?.status||"Pending";
+  let isAttended = status==="Attended";
+  let isSkipped = status==="Skipped";
+  return `<div class="teacherbox"><div class="row between"><div><b>${esc(s.name)}</b><div class="tiny muted">${t12(slot.time)} · ${slot.duration}m · ${esc(slot.subject||s.subject)} · ${esc(s.academy)}</div></div><span class="pill ${isAttended?'pill-attended':isSkipped?'pill-skipped':''}">${status}</span></div><div class="row" style="margin-top:8px"><button type="button" class="small ${isAttended?'active-attended':''}" data-mark-action="true" data-mark-id="${esc(s.id)}" data-mark-date="${esc(date)}" data-mark-day="${esc(day)}" data-mark-time="${esc(slot.time)}" data-mark-teacher="${esc(teacherName)}" data-mark-status="Attended">${isAttended?'✓ Attended':'Attended'}</button><button type="button" class="small danger ${isSkipped?'active-btn':''}" data-mark-action="true" data-mark-id="${esc(s.id)}" data-mark-date="${esc(date)}" data-mark-day="${esc(day)}" data-mark-time="${esc(slot.time)}" data-mark-teacher="${esc(teacherName)}" data-mark-status="Skipped">${isSkipped?'✕ Skipped':'Skipped'}</button></div></div>`;
  }).join("")||'<div class="notice">No classes assigned to you for this date.</div>';
 }
 
@@ -253,17 +292,36 @@ window.mark=function(id,date,day,time,teacherName,status){
 };
 
 function renderAdminAttendance(){
- let date=$("adminAttendanceDate").value||today(),tf=$("adminAttendanceTeacher").value||"",sf=$("adminAttendanceStatus").value||"";
+ let date=$("adminAttendanceDate").value||today();
+ if(!$("adminAttendanceDate").value) $("adminAttendanceDate").value=date;
+ let tf=$("adminAttendanceTeacher").value||"",sf=$("adminAttendanceStatus").value||"";
  $("adminAttendanceTeacher").innerHTML='<option value="">All teachers</option>'+db.teachers.map(t=>`<option value="${esc(t.name)}" ${tf===t.name?"selected":""}>${esc(t.name)}</option>`).join("");
  let records=db.attendance.filter(a=>a.date===date&&(!tf||a.teacher===tf)&&(!sf||a.status===sf));
  $("adminAttendanceSummary").innerHTML=[["Attended",records.filter(a=>a.status==="Attended").length],["Skipped",records.filter(a=>a.status==="Skipped").length],["Recorded",records.length]].map(([k,v])=>`<div class="stat">${k}<strong>${v}</strong></div>`).join("");
- $("adminAttendanceBody").innerHTML=records.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.studentName)}</td><td>${esc(a.teacher)}</td><td>${a.time?t12(a.time):"—"}</td><td><span class="pill">${esc(a.status)}</span></td></tr>`).join("")||'<tr><td colspan="5" class="muted">No attendance records for this date.</td></tr>';
+ $("adminAttendanceBody").innerHTML=records.sort((a,b)=>(a.time||"").localeCompare(b.time||"")).map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(a.studentName)}</td><td>${esc(a.teacher)}</td><td>${a.time?t12(a.time):"—"}</td><td><span class="pill ${a.status==='Attended'?'pill-attended':a.status==='Skipped'?'pill-skipped':''}">${esc(a.status)}</span></td></tr>`).join("")||'<tr><td colspan="5" class="muted">No attendance records for this date.</td></tr>';
  let weekday=DAYS[(new Date(date+"T12:00:00").getDay()+6)%7];
  let pending=db.students.flatMap(s=>slots(s).filter(z=>z.day===weekday&&s.start<=date).map(z=>({s,z,tn:z.teacher||s.teacher,key:attendanceKey(s.id,date,weekday,z.time,z.teacher||s.teacher)}))).filter(x=>!db.attendance.some(a=>a.key===x.key));
  $("adminPendingList").innerHTML=pending.map(x=>`<div class="teacherbox"><b>${esc(x.s.name)}</b> · ${esc(x.tn)} · ${t12(x.z.time)} · ${esc(x.z.subject||x.s.subject)} <span class="pill">Pending</span></div>`).join("")||'<div class="notice good">No pending classes for this date.</div>';
 }
 
-function renderAll(){if(!session)return;fillTeacherOptions();let visible=session.role==="admin"?db.students:db.students.filter(s=>slots(s).some(z=>(z.teacher||s.teacher)===session.name));$("statStudents").textContent=visible.length;$("statTeachers").textContent=session.role==="admin"?db.teachers.length:1;$("statClasses").textContent=db.students.reduce((n,s)=>n+slots(s).length,0);renderConflicts();if(session.role==="admin"){renderStudents();renderTeachers();renderCalendar("masterCalendar",weekOffset,false);renderAdminAttendance()}else{renderCalendar("teacherCalendar",teacherOffset,true);renderAttendance()}}
+function renderAll(){
+ if(!session)return;
+ fillTeacherOptions();
+ let visible=session.role==="admin"?db.students:db.students.filter(s=>slots(s).some(z=>(z.teacher||s.teacher)===session.name));
+ $("statStudents").textContent=visible.length;
+ $("statTeachers").textContent=session.role==="admin"?db.teachers.length:1;
+ $("statClasses").textContent=db.students.reduce((n,s)=>n+slots(s).length,0);
+ renderConflicts();
+ if(session.role==="admin"){
+   renderStudents();
+   renderTeachers();
+   renderCalendar("masterCalendar",weekOffset,false);
+   renderAdminAttendance();
+ }else{
+   renderCalendar("teacherCalendar",teacherOffset,true);
+   renderAttendance();
+ }
+}
 
 $("studentSearch").addEventListener("input",renderStudents);
 $("filterTeacher").addEventListener("change",()=>renderCalendar("masterCalendar",weekOffset,false));
